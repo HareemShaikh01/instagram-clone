@@ -1,21 +1,11 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { useCallback, useState } from "react";
 import { SessionProvider } from "@/components/session";
 import { BadgeProvider, MobileBottomNav, MobileTopBar, Sidebar, SuggestionsPanel } from "@/components/nav";
 import { CreatePostModal } from "@/components/create-post-modal";
 import { CreateStoryModal } from "@/components/create-story-modal";
-
-type CreateApi = {
-  openPost: () => void;
-  openStory: () => void;
-};
-
-const CreateCtx = createContext<CreateApi>({ openPost: () => {}, openStory: () => {} });
-
-export function useCreate() {
-  return useContext(CreateCtx);
-}
+import { CreateCtx } from "@/components/create-context";
 
 function Shell({ children }: { children: React.ReactNode }) {
   const [postOpen, setPostOpen] = useState(false);

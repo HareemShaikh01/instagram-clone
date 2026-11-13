@@ -6,7 +6,7 @@ import { Button, EmptyState, ErrorState, Spinner } from "@/components/ui";
 import { PostCard, PostSkeleton } from "@/components/post-card";
 import { StoryRail } from "@/components/story-rail";
 import { usePostFeed } from "@/lib/use-post-feed";
-import { useCreate } from "@/app/(app)/layout";
+import { useCreate } from "@/components/create-context";
 
 export default function FeedPage() {
   const { openPost } = useCreate();

@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { useApi } from "@/lib/api-client";
 import { Avatar, Skeleton } from "@/components/ui";
 import { StoryViewer } from "@/components/story-viewer";
-import { useCreate } from "@/app/(app)/layout";
+import { useCreate } from "@/components/create-context";
 import type { StoryGroupDTO } from "@/lib/types";
 
 /** Horizontal stories carousel shown above the feed. */
