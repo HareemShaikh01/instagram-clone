@@ -40,3 +40,56 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run build
+
+  # Builds the container image and exercises it end to end (auth, chunked
+  # media upload, byte-exact and ranged fetches, post, story) so a broken
+  # image or media path cannot reach main. Mirrors scripts/container-smoke.sh.
+  container-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: ubuntu
+          POSTGRES_PASSWORD: ubuntu
+          POSTGRES_DB: instagram
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U ubuntu -d instagram"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply schema migrations
+        run: |
+          npm ci
+          npx drizzle-kit migrate
+        env:
+          DATABASE_URL: postgres://ubuntu:ubuntu@127.0.0.1:5432/instagram
+      - name: Build image
+        run: docker build -t instagram-clone:smoke .
+      - name: Run app container
+        run: |
+          docker run -d --name smoke-app \
+            --add-host=host.docker.internal:host-gateway \
+            -e "DATABASE_URL=postgres://ubuntu:ubuntu@host.docker.internal:5432/instagram" \
+            -e "SESSION_SECRET=$(openssl rand -hex 32)" \
+            -p 3000:3000 \
+            instagram-clone:smoke
+      - name: Smoke test the container
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/healthz || true)
+            [ "$code" = "200" ] && break
+            sleep 1
+          done
+          ./scripts/container-smoke.sh http://127.0.0.1:3000
+      - name: Dump app logs on failure
+        if: failure()
+        run: docker logs smoke-app || true

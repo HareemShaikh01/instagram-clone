@@ -2,7 +2,7 @@ node_modules/
 .next/
 out/
 build/
-uploads/
+/uploads/
 .env.local
 *.tsbuildinfo
 next-env.d.ts
