@@ -30,8 +30,10 @@ curl -sf -b "$WORK/jar" "$BASE/api/auth/session" | jq -e '.user.username == "smo
   >/dev/null || fail "session does not resolve to smoke_user"
 
 # --- payload: a real PNG padded past two chunk windows -----------------------
-convert -size 64x64 gradient:red-blue png:- > "$WORK/payload.png" 2>/dev/null \
-  || magick -size 64x64 gradient:red-blue png:- > "$WORK/payload.png"
+# A 1x1 PNG embedded as base64 keeps the script dependency-free (CI runners
+# have no ImageMagick); trailing random bytes stretch it over chunk windows.
+printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC' \
+  | base64 -d > "$WORK/payload.png"
 head -c $((7 * 1024 * 1024)) /dev/urandom >> "$WORK/payload.png"
 SIZE=$(stat -c%s "$WORK/payload.png")
 SUM=$(sha256sum "$WORK/payload.png" | cut -d' ' -f1)
