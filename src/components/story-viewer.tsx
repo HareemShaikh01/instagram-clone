@@ -34,6 +34,7 @@ export function StoryViewer({
   const [viewersFor, setViewersFor] = useState<StoryDTO | null>(null);
   const [viewers, setViewers] = useState<Viewer[] | null>(null);
   const [viewersLoading, setViewersLoading] = useState(false);
+  const [mediaFailed, setMediaFailed] = useState(false);
   const viewed = useRef<Set<string>>(new Set());
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const progressRef = useRef(0);
@@ -68,6 +69,7 @@ export function StoryViewer({
   useEffect(() => {
     progressRef.current = 0;
     setProgress(0);
+    setMediaFailed(false);
   }, [pos]);
 
   // Timer-driven progress for image/text stories (video drives itself).
@@ -234,14 +236,19 @@ export function StoryViewer({
               {story.text}
             </p>
           </div>
+        ) : !story.media || mediaFailed ? (
+          <div className="flex h-full w-full items-center justify-center p-8 text-center text-base text-white/70">
+            Media unavailable
+          </div>
         ) : story.kind === "video" ? (
           <video
             ref={videoRef}
-            src={story.media?.url}
+            src={story.media.url}
             className="max-h-full max-w-full"
             autoPlay
             muted
             playsInline
+            onError={() => setMediaFailed(true)}
             onTimeUpdate={(e) => {
               const d = e.currentTarget.duration;
               if (d > 0) {
@@ -253,9 +260,12 @@ export function StoryViewer({
             onEnded={goNext}
           />
         ) : (
-          story.media && (
-            <img src={story.media.url} alt="" className="max-h-full max-w-full object-contain" />
-          )
+          <img
+            src={story.media.url}
+            alt=""
+            className="max-h-full max-w-full object-contain"
+            onError={() => setMediaFailed(true)}
+          />
         )}
 
         {story.overlayText && (

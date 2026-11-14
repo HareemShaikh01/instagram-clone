@@ -64,22 +64,37 @@ async function setup(): Promise<void> {
   await ensureTestDatabaseExists();
   const sql = postgres(databaseUrl, { prepare: false, max: 1, onnotice: () => {} });
   try {
-    // Serialize parallel vitest workers so only one applies the migration.
+    // Serialize parallel vitest workers so only one applies the migrations.
     await sql`select pg_advisory_lock(hashtext('instagram_test_schema'))`;
+    const migrationDir = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "src",
+      "db",
+      "migrations",
+    );
+    const journal = JSON.parse(
+      readFileSync(path.join(migrationDir, "meta", "_journal.json"), "utf8"),
+    ) as { entries: Array<{ tag: string }> };
+    // Track which migrations this test database has already received so new
+    // migrations apply incrementally instead of requiring a dropped database.
+    await sql`create table if not exists test_migrations (tag text primary key)`;
+    // Databases created before migration tracking existed already hold the
+    // initial schema; seed the tracker instead of re-running 0000.
     const [{ exists }] = await sql`select to_regclass('public.users') is not null as exists`;
-    if (!exists) {
-      const migrationDir = path.join(
-        path.dirname(fileURLToPath(import.meta.url)),
-        "..",
-        "src",
-        "db",
-        "migrations",
-      );
-      const migration = readFileSync(path.join(migrationDir, "0000_init.sql"), "utf8");
+    if (exists) {
+      await sql`insert into test_migrations (tag) values (${"0000_init"}) on conflict do nothing`;
+    }
+    const appliedRows = await sql`select tag from test_migrations`;
+    const applied = new Set(appliedRows.map((r) => r.tag as string));
+    for (const { tag } of journal.entries) {
+      if (applied.has(tag)) continue;
+      const migration = readFileSync(path.join(migrationDir, `${tag}.sql`), "utf8");
       for (const statement of migration.split("--> statement-breakpoint")) {
         const trimmed = statement.trim();
         if (trimmed) await sql.unsafe(trimmed);
       }
+      await sql`insert into test_migrations (tag) values (${tag})`;
     }
     globalThis.__instagramTestSchemaReady = true;
   } finally {

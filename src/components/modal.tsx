@@ -34,7 +34,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
       <div className="fade-in absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className={`slide-up relative w-full ${width} rounded-xl bg-elevated shadow-2xl ring-1 ring-line`}>
+      <div className={`slide-up relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-y-auto ${width} rounded-xl bg-elevated shadow-2xl ring-1 ring-line`}>
         {children}
       </div>
     </div>

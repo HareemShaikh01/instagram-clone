@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { User } from "lucide-react";
 
@@ -16,9 +17,18 @@ export function Avatar({
   ring?: "seen" | "unseen" | false;
   onClick?: () => void;
 }) {
-  const inner = src ? (
+  const [broken, setBroken] = useState(false);
+  const inner = src && !broken ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} width={size} height={size} className="h-full w-full rounded-full object-cover" loading="lazy" />
+    <img
+      src={src}
+      alt={alt}
+      width={size}
+      height={size}
+      className="h-full w-full rounded-full object-cover"
+      loading="lazy"
+      onError={() => setBroken(true)}
+    />
   ) : (
     <span
       className="flex h-full w-full items-center justify-center rounded-full bg-surface text-muted"

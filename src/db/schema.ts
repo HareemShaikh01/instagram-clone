@@ -1,6 +1,7 @@
 import {
   boolean,
   check,
+  customType,
   index,
   integer,
   pgTable,
@@ -11,6 +12,13 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+
+/** Raw binary column used to persist uploaded media inside Postgres. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 /* ------------------------------------------------------------------ users */
 
@@ -79,7 +87,11 @@ export const media = pgTable(
     kind: text("kind").notNull(), // image | video
     mimeType: text("mime_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
-    storageKey: text("storage_key").notNull(),
+    // Legacy filesystem key (pre-blob-storage rows). New uploads keep bytes in
+    // media_blobs and leave this null.
+    storageKey: text("storage_key"),
+    /** pending = chunked upload in flight; ready = bytes complete. */
+    state: text("state").notNull().default("ready"),
     width: integer("width"),
     height: integer("height"),
     durationMs: integer("duration_ms"),
@@ -87,6 +99,15 @@ export const media = pgTable(
   },
   (t) => [index("media_owner_idx").on(t.ownerId)],
 );
+
+/** Uploaded bytes for a media row, stored in Postgres so they survive
+ *  serverless restarts and are visible to every instance. */
+export const mediaBlobs = pgTable("media_blobs", {
+  mediaId: uuid("media_id")
+    .primaryKey()
+    .references(() => media.id, { onDelete: "cascade" }),
+  data: bytea("data").notNull(),
+});
 
 /* --------------------------------------------------------------- social graph */
 

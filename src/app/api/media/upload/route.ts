@@ -1,12 +1,11 @@
-import { db } from "@/db/client";
-import { media } from "@/db/schema";
 import { ApiError, clientIp, ok, rateLimit } from "@/lib/api";
-import { param, withAuth } from "@/lib/api-auth";
+import { withAuth } from "@/lib/api-auth";
 import {
   classify,
+  createMediaRecord,
   maxImageBytes,
   maxVideoBytes,
-  storeUpload,
+  putBlob,
 } from "@/lib/media";
 
 export const POST = withAuth(async (req, user) => {
@@ -39,18 +38,13 @@ export const POST = withAuth(async (req, user) => {
   if (file.size === 0) throw new ApiError(400, "empty_file", "File is empty");
 
   const buf = Buffer.from(await file.arrayBuffer());
-  const { storageKey, sizeBytes } = await storeUpload(buf, file.type);
-
-  const [row] = await db
-    .insert(media)
-    .values({
-      ownerId: user.id,
-      kind,
-      mimeType: file.type,
-      sizeBytes,
-      storageKey,
-    })
-    .returning();
+  const row = await createMediaRecord({
+    ownerId: user.id,
+    kind,
+    mimeType: file.type,
+    sizeBytes: buf.byteLength,
+  });
+  await putBlob(row.id, buf);
 
   return ok({
     media: {

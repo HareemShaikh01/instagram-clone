@@ -8,6 +8,10 @@
 ## Database client
 - `src/db/client.ts` creates the postgres client and the drizzle instance lazily (on first query) so `next build` does not require `DATABASE_URL`. Keep it lazy: eager init makes any build without runtime env vars fail during page-data collection (e.g. Vercel builds).
 
+## Tests and CI
+- `tests/setup.ts` auto-creates the `instagram_test` database when missing (fresh clones, the CI postgres service) and only borrows `DATABASE_URL` when it points at localhost/127.0.0.1/::1. A remote `DATABASE_URL` (e.g. the Vault Neon URL) is never used for tests; `TEST_DATABASE_URL` overrides everything.
+- CI (`.github/workflows/ci.yml`) runs on push to `main`/`master` and on PRs: `npm ci` → `npx tsc --noEmit` → `npm test` → `npm run build`, with a `postgres:18` service container. First green run: 43617185546.
+
 ## Verifying auth/UI end to end
 - Backend auth can be checked with curl cookie jars against `http://127.0.0.1:3000` (`POST /api/auth/register|login|logout`, `GET /api/auth/session`). Seed users (`alice`, `bob`) have hashed passwords — always register a fresh user (password rule: min 8 chars with a letter and a number) instead of guessing seeds.
 - For UI-level proof, prefer a direct Playwright run over the built-in browser tool when fills race hydration: wait for a `__reactFiber*` key on an input, then fill/click. See project memory `direct-playwright-ui-check`.

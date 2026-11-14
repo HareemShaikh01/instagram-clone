@@ -53,11 +53,33 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   return json as T;
 }
 
+export type MediaUploadResult = {
+  id: string;
+  kind: "image" | "video";
+  url: string;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+};
+
+/** Files at or below this size go through the single-shot multipart endpoint;
+ *  larger files use the chunked protocol so no single request exceeds the
+ *  serverless request-body limit (4.5 MB on Vercel). */
+const SINGLE_SHOT_MAX_BYTES = 3 * 1024 * 1024;
+
 /** Upload a file with progress callbacks; resolves to the created MediaDTO. */
-export function uploadMedia(
+export async function uploadMedia(
   file: File,
   onProgress?: (pct: number) => void,
-): Promise<{ media: { id: string; kind: "image" | "video"; url: string; width: number | null; height: number | null; durationMs: number | null } }> {
+): Promise<{ media: MediaUploadResult }> {
+  if (file.size <= SINGLE_SHOT_MAX_BYTES) return uploadSingleShot(file, onProgress);
+  return uploadChunked(file, onProgress);
+}
+
+function uploadSingleShot(
+  file: File,
+  onProgress?: (pct: number) => void,
+): Promise<{ media: MediaUploadResult }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/media/upload");
@@ -72,7 +94,7 @@ export function uploadMedia(
         /* fall through */
       }
       if (xhr.status >= 200 && xhr.status < 300 && json.media) {
-        resolve(json as unknown as { media: { id: string; kind: "image" | "video"; url: string; width: number | null; height: number | null; durationMs: number | null } });
+        resolve(json as unknown as { media: MediaUploadResult });
       } else {
         reject(new ApiClientError(xhr.status, json.error?.code ?? "upload_failed", json.error?.message ?? "Upload failed"));
       }
@@ -82,6 +104,62 @@ export function uploadMedia(
     fd.append("file", file);
     xhr.send(fd);
   });
+}
+
+async function uploadChunked(
+  file: File,
+  onProgress?: (pct: number) => void,
+): Promise<{ media: MediaUploadResult }> {
+  const init = await api<{ media: MediaUploadResult; chunkSize: number }>("/api/media/uploads", {
+    body: { type: file.type, size: file.size },
+  });
+  const created = init.media;
+  const chunkSize = init.chunkSize;
+  let resyncs = 0;
+
+  let offset = 0;
+  while (offset < file.size) {
+    const chunk = file.slice(offset, Math.min(offset + chunkSize, file.size));
+    let res: Response;
+    try {
+      res = await fetch(`/api/media/uploads/${created.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/octet-stream", "x-media-offset": String(offset) },
+        body: chunk,
+      });
+    } catch {
+      throw new ApiClientError(0, "network_error", "Network error during upload");
+    }
+    if (!res.ok) {
+      const info = (await res.json().catch(() => null)) as {
+        error?: { code?: string; message?: string; details?: { expected?: number } };
+      } | null;
+      const err = info?.error;
+      // Lost or duplicated chunk: resync to the server's stored size and retry.
+      const expected = err?.details?.expected;
+      if (
+        res.status === 409 &&
+        err?.code === "offset_conflict" &&
+        typeof expected === "number" &&
+        expected !== offset &&
+        expected <= file.size &&
+        ++resyncs <= 3
+      ) {
+        offset = expected;
+        continue;
+      }
+      throw new ApiClientError(res.status, err?.code ?? "upload_failed", err?.message ?? "Upload failed", err?.details);
+    }
+    const data = (await res.json().catch(() => null)) as { size?: number } | null;
+    offset = typeof data?.size === "number" ? data.size : offset + chunk.size;
+    if (onProgress) onProgress(Math.min(100, Math.round((offset / file.size) * 100)));
+  }
+
+  const done = await api<{ media: MediaUploadResult }>(`/api/media/uploads/${created.id}/complete`, {
+    method: "POST",
+  });
+  if (onProgress) onProgress(100);
+  return done;
 }
 
 export type UseApiResult<T> = {

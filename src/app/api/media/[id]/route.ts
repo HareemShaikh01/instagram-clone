@@ -1,11 +1,10 @@
 import { eq } from "drizzle-orm";
-import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { media } from "@/db/schema";
 import { ApiError, err } from "@/lib/api";
 import { param, withAuth } from "@/lib/api-auth";
-import { readStoredFile, streamRange } from "@/lib/media";
-import { postVisibilitySql, storyVisibilitySql } from "@/lib/visibility";
+import { mediaAllowed } from "@/lib/media-acl";
+import { openMediaSource } from "@/lib/media";
 
 export const GET = withAuth(async (req, viewer, ctx) => {
   const id = await param(ctx, "id");
@@ -13,36 +12,15 @@ export const GET = withAuth(async (req, viewer, ctx) => {
 
   const [row] = await db.select().from(media).where(eq(media.id, id)).limit(1);
   if (!row) return err(404, "not_found", "Media not found");
+  if (row.state !== "ready") return err(404, "not_found", "Media not found");
 
   // Access control: owner, or media attached to content the viewer can see.
-  const acl = await db.execute(sql`
-    select (
-      m.owner_id = ${viewer.id}
-      or exists (
-        select 1 from post_media pm join posts p on p.id = pm.post_id
-        where pm.media_id = m.id and ${postVisibilitySql(viewer.id)}
-      )
-      or exists (
-        select 1 from stories s
-        where s.media_id = m.id and (s.expires_at > now() or s.author_id = ${viewer.id})
-          and ${storyVisibilitySql(viewer.id)}
-      )
-      or exists (
-        select 1 from messages msg
-        join conversation_participants cp on cp.conversation_id = msg.conversation_id
-        where msg.media_id = m.id and cp.user_id = ${viewer.id}
-      )
-      or exists (select 1 from users u where u.avatar_media_id = m.id)
-    ) as allowed
-    from media m
-    where m.id = ${id}
-  `);
-  const first = (acl as { rows?: Array<{ allowed: boolean }> }).rows?.[0]
-    ?? (acl as unknown as Array<{ allowed: boolean }>)[0];
-  if (!first?.allowed) return err(403, "forbidden", "You do not have access to this media");
+  if (!(await mediaAllowed(viewer.id, id)))
+    return err(403, "forbidden", "You do not have access to this media");
 
-  const filePath = await readStoredFile(row.storageKey);
-  const etag = `"${row.id}-${row.sizeBytes}"`;
+  const source = await openMediaSource(row);
+  const size = source.size;
+  const etag = `"${row.id}-${size}"`;
   if (req.headers.get("if-none-match") === etag) {
     return new Response(null, {
       status: 304,
@@ -50,7 +28,6 @@ export const GET = withAuth(async (req, viewer, ctx) => {
     });
   }
 
-  const size = row.sizeBytes;
   const baseHeaders: Record<string, string> = {
     "Content-Type": row.mimeType,
     "Cache-Control": "private, max-age=31536000, immutable",
@@ -72,7 +49,7 @@ export const GET = withAuth(async (req, viewer, ctx) => {
       }
       end = Math.min(end, size - 1);
       if (start >= 0 && start <= end) {
-        return new Response(streamRange(filePath, start, end), {
+        return new Response(source.open(start, end), {
           status: 206,
           headers: {
             ...baseHeaders,
@@ -88,7 +65,7 @@ export const GET = withAuth(async (req, viewer, ctx) => {
     }
   }
 
-  return new Response(streamRange(filePath, 0, size - 1), {
+  return new Response(source.open(0, size - 1), {
     headers: { ...baseHeaders, "Content-Length": String(size) },
   });
 });

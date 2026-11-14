@@ -4,12 +4,14 @@ import { useCallback, useState } from "react";
 import { SessionProvider } from "@/components/session";
 import { BadgeProvider, MobileBottomNav, MobileTopBar, Sidebar, SuggestionsPanel } from "@/components/nav";
 import { CreatePostModal } from "@/components/create-post-modal";
+import { CreateSheet } from "@/components/create-sheet";
 import { CreateStoryModal } from "@/components/create-story-modal";
 import { CreateCtx } from "@/components/create-context";
 
 function Shell({ children }: { children: React.ReactNode }) {
   const [postOpen, setPostOpen] = useState(false);
   const [storyOpen, setStoryOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const openPost = useCallback(() => setPostOpen(true), []);
   const openStory = useCallback(() => setStoryOpen(true), []);
@@ -27,7 +29,13 @@ function Shell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </div>
-        <MobileBottomNav onCreate={openStory} />
+        <MobileBottomNav onCreate={() => setSheetOpen(true)} />
+        <CreateSheet
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          onPost={openPost}
+          onStory={openStory}
+        />
         <CreatePostModal open={postOpen} onClose={() => setPostOpen(false)} />
         <CreateStoryModal open={storyOpen} onClose={() => setStoryOpen(false)} />
       </BadgeProvider>

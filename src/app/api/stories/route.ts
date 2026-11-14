@@ -17,13 +17,21 @@ async function purgeExpiredStories(): Promise<void> {
   if (expired.length === 0) return;
   for (const s of expired) {
     await db.delete(stories).where(eq(stories.id, s.id));
-    if (s.mediaId) {
-      const [m] = await db.select().from(media).where(eq(media.id, s.mediaId)).limit(1);
-      if (m) {
-        await db.delete(media).where(eq(media.id, m.id));
-        await deleteStoredFile(m.storageKey);
-      }
-    }
+    if (!s.mediaId) continue;
+    // Delete the media only when nothing else references it — a story's media
+    // can also back a post, another story, a message, or an avatar.
+    const orphans = await db.execute(sql`
+      delete from media m
+      where m.id = ${s.mediaId}
+        and not exists (select 1 from post_media pm where pm.media_id = m.id)
+        and not exists (select 1 from stories st where st.media_id = m.id)
+        and not exists (select 1 from messages msg where msg.media_id = m.id)
+        and not exists (select 1 from users u where u.avatar_media_id = m.id)
+      returning m.storage_key
+    `);
+    const rows = (orphans as { rows?: Array<{ storage_key: string | null }> }).rows
+      ?? (orphans as unknown as Array<{ storage_key: string | null }>);
+    for (const r of rows ?? []) await deleteStoredFile(r.storage_key);
   }
 }
 
