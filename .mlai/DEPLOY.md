@@ -12,7 +12,7 @@
 ## Vercel project state (2026-11-14)
 
 - `instagram-clone-1` (prj_qP45m5fdO5mV50fXZ6f5LDjyqm9Z) is an unrelated Firebase/Create-React-App project: a static bundle with no `/api` backend (every API path returns `index.html`). It is not this repo — delete or ignore it.
-- `instagram-clone` (prj_V8Ek7AslcxnhFOyAKxlkfREHYVsu) is this repo's project: created but empty (zero deployments, not git-linked). To deploy: import `HareemShaikh01/instagram-clone` (branch `main`) into Vercel with the env vars above, or delete it first to reclaim the name. Its unique deployment URLs sit behind Vercel Authentication (default); the stable `<project>.vercel.app` domain is public.
+- `instagram-clone` (prj_V8Ek7AslcxnhFOyAKxlkfREHYVsu) is this repo's project, git-linked to `HareemShaikh01/instagram-clone` (branch `main`): every push to `main` triggers a production deployment automatically. Its unique deployment URLs sit behind Vercel Authentication (default); the stable `<project>.vercel.app` domain is public.
 - The Vault Neon database (host `ep-blue-frog-bb4oeyqp-pooler…neon.tech`) already has the full schema applied and 0 users — no migrate step is needed on first deploy; sign-up creates the first account.
 
 ## Vercel (managed)
