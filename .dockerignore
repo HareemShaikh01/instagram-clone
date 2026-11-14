@@ -1,0 +1,12 @@
+.git
+.github
+.next
+node_modules
+uploads
+tests
+.mlai
+.env*
+*.tsbuildinfo
+README.md
+DEPLOY.md
+docker-compose.yml
