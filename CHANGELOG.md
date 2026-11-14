@@ -17,6 +17,9 @@ versions are not released yet, so entries are grouped by date.
   comment query performance fix (suite now 27 tests).
 
 ### Fixed
+- CI test bootstrap: the test setup now creates the `instagram_test` database when
+  it is missing (fresh clones, CI service containers) and only borrows a `DATABASE_URL`
+  that points at localhost, so a remote database is never used for tests.
 - Comment save error after posting a comment.
 - Notification thumbnails for video posts.
 - Slow comment query on post detail (added index-backed fetch).
