@@ -173,6 +173,7 @@ export async function queryPosts(opts: PostQueryOptions): Promise<PostDTO[]> {
 export async function queryComments(params: {
   postId: string;
   viewerId: string;
+  id?: string;
   parentId?: string | null;
   limit?: number;
   after?: { createdAt: Date; id: string };
@@ -184,6 +185,7 @@ export async function queryComments(params: {
       ? sql`c.parent_id is null`
       : sql`c.parent_id = ${params.parentId}`,
   );
+  if (params.id) filters.push(sql`c.id = ${params.id}`);
   if (params.after)
     filters.push(sql`(c.created_at, c.id) > (${params.after.createdAt}, ${params.after.id})`);
   const where = sql.join(filters, sql` and `);

@@ -44,13 +44,16 @@ export const GET = withAuth(async (req, viewer, ctx) => {
   const filePath = await readStoredFile(row.storageKey);
   const etag = `"${row.id}-${row.sizeBytes}"`;
   if (req.headers.get("if-none-match") === etag) {
-    return new Response(null, { status: 304, headers: { ETag: etag } });
+    return new Response(null, {
+      status: 304,
+      headers: { ETag: etag, "Cache-Control": "private, max-age=31536000, immutable" },
+    });
   }
 
   const size = row.sizeBytes;
   const baseHeaders: Record<string, string> = {
     "Content-Type": row.mimeType,
-    "Cache-Control": "private, max-age=86400",
+    "Cache-Control": "private, max-age=31536000, immutable",
     ETag: etag,
     "Accept-Ranges": "bytes",
   };

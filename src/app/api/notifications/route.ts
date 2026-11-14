@@ -17,7 +17,7 @@ export const GET = withAuth(async (req, user) => {
     read_at: Date | null;
     created_at: Date;
     actor: { id: string; username: string; fullName: string; avatarUrl: string | null; isPrivate: boolean };
-    post_thumb: string | null;
+    post_thumb: { url: string; kind: string } | null;
     snippet: string | null;
   }>(sql`
     select
@@ -28,7 +28,7 @@ export const GET = withAuth(async (req, user) => {
         'isPrivate', au.is_private
       ) as actor,
       case when p.id is null then null else (
-        select '/api/media/' || m.id
+        select json_build_object('url', '/api/media/' || m.id, 'kind', m.kind)
         from post_media pm join media m on m.id = pm.media_id
         where pm.post_id = p.id order by pm.position limit 1
       ) end as post_thumb,
@@ -59,7 +59,8 @@ export const GET = withAuth(async (req, user) => {
       postId: r.post_id,
       commentId: r.comment_id,
       conversationId: r.conversation_id,
-      postThumbUrl: r.post_thumb,
+      postThumbUrl: r.post_thumb?.url ?? null,
+      postThumbKind: r.post_thumb?.kind === "video" ? "video" : r.post_thumb ? "image" : null,
       snippet: r.snippet,
       readAt: r.read_at ? new Date(r.read_at).toISOString() : null,
       createdAt: new Date(r.created_at).toISOString(),

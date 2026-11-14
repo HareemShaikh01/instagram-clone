@@ -94,9 +94,10 @@ export const POST = withAuth(async (req, user, ctx) => {
   const { items } = await queryComments({
     postId,
     viewerId: user.id,
-    parentId: body.parentId ?? null,
-    limit: 50,
+    id: comment.id,
+    parentId: body.parentId ?? undefined,
+    limit: 1,
   });
-  const created = items.find((c) => c.id === comment.id) ?? null;
+  const created = items[0] ?? null;
   return ok({ comment: created });
 });

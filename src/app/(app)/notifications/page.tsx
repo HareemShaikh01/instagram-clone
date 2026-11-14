@@ -165,8 +165,18 @@ export default function NotificationsPage() {
                   <span className="mt-0.5 block text-xs text-muted">{timeAgo(n.createdAt)}</span>
                 </span>
                 {n.postThumbUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={n.postThumbUrl} alt="" className="h-11 w-11 shrink-0 rounded-md object-cover" loading="lazy" />
+                  n.postThumbKind === "video" ? (
+                    <video
+                      src={n.postThumbUrl}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="h-11 w-11 shrink-0 rounded-md object-cover"
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={n.postThumbUrl} alt="" className="h-11 w-11 shrink-0 rounded-md object-cover" loading="lazy" />
+                  )
                 ) : !n.readAt ? (
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent" aria-label="Unread" />
                 ) : null}

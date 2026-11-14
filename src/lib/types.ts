@@ -103,6 +103,7 @@ export type NotificationDTO = {
   commentId: string | null;
   conversationId: string | null;
   postThumbUrl: string | null;
+  postThumbKind: "image" | "video" | null;
   snippet: string | null;
   readAt: string | null;
   createdAt: string;
